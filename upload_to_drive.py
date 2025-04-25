@@ -16,11 +16,13 @@ os.makedirs("gdrive_auth", exist_ok=True)
 cred_path = "gdrive_auth/credentials.json"
 with open(cred_path, "w") as f:
     f.write(cred_json)
+    
+from pydrive2.auth import ServiceAccountCredentials
 
-# Configurar PyDrive2 con la cuenta de servicio
 gauth = GoogleAuth()
-gauth.LoadSettings()
-gauth.credentials = gauth.LoadServiceConfigFile(cred_path)
+gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name(cred_path, ["https://www.googleapis.com/auth/drive"])
+gauth.Authorize()
+
 drive = GoogleDrive(gauth)
 
 # ID de la carpeta de destino en Drive (compartida con la cuenta de servicio)
