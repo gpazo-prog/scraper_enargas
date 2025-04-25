@@ -16,12 +16,13 @@ jobs:
     - name: Checkout del repositorio
       uses: actions/checkout@v4
 
-    - name: Instalar dependencias
+    - name: Instalar dependencias Python
       run: |
-        sudo apt update
-        sudo apt install -y chromium-chromedriver
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+    - name: Instalar Chrome (rápido)
+      uses: browser-actions/setup-chrome@v1
 
     - name: Ejecutar el scraper
       run: |
