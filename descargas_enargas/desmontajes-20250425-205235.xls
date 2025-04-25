@@ -1,0 +1,75 @@
+	<style type="text/css">
+	
+		td{
+			font-family: Calibri, Arial, "Helvetica Neue", Helvetica,  sans-serif;
+			font-size:12pt;
+			color:#000;
+			font-weight:normal;
+			text-align:center;
+		}
+		
+		
+		td.titulo1, h1{
+			font-size:26pt;
+			border:none;
+			font-weight:bold;
+		}
+		h1{ color:#0695d6; }
+		td.titulo1{	background-color:#0695d6; color:#fff; }
+		
+		
+		td.titulo2, h2{
+			font-size:15pt;
+			border:none;
+			color:#0695d6;
+			font-weight:bold;
+		}
+
+		td.encabezado, th.CT1{
+			font-weight:bold;
+			background-color:#5bc0de;
+			color:#fff;
+		}
+		
+		table.datos,  th,  td {
+			border: 0.5pt solid #ccc;
+			border-collapse: collapse;			
+		}
+		
+
+		td.zebra, td.CDR, tr.CDR td{
+			background-color:#eee;
+		}
+
+		
+		td.total, tr.CT2 td{
+			font-weight:bold;
+			background-color:#ccc;
+			color:#000;		
+		}	
+			
+		.left{
+			text-align: left;
+		}
+		
+		.right{
+			text-align: right;
+		}
+
+	</style>
+	
+	<table width='100%'>
+			<tr><td class='titulo1' colspan='26'> Datos Operativos GNC</td></tr>
+			<tr><td class='titulo2' colspan='26'></td></tr> 
+			<tr><td class='titulo2' colspan='26'></td></tr>
+			<tr><td class='titulo2' colspan='26'>Total de desmontajes de equipos en veh&iacute;culos discriminado por mes y provincia - A&ntilde;o 2025</td></tr>
+		</table>
+		<br />
+		<br />
+		<br /><table class='datos' width='100%'>
+			<tr><td class='encabezado'>Mes</td><td class='encabezado'>Buenos<BR>Aires</td><td class='encabezado'>Capital<BR>Federal</td><td class='encabezado'>Catamarca</td><td class='encabezado'>Chaco</td><td class='encabezado'>Chubut</td><td class='encabezado'>Córdoba</td><td class='encabezado'>Corrientes</td><td class='encabezado'>Entre<BR>Ríos</td><td class='encabezado'>Formosa</td><td class='encabezado'>Jujuy</td><td class='encabezado'>La<BR>Pampa</td><td class='encabezado'>La<BR>Rioja</td><td class='encabezado'>Mendoza</td><td class='encabezado'>Misiones</td><td class='encabezado'>Neuquén</td><td class='encabezado'>Río<BR>Negro</td><td class='encabezado'>Salta</td><td class='encabezado'>San<BR>Juan</td><td class='encabezado'>San<BR>Luis</td><td class='encabezado'>Santa<BR>Cruz</td><td class='encabezado'>Santa<BR>Fe</td><td class='encabezado'>Sgo. del<BR>Estero</td><td class='encabezado'>T. del<BR>Fuego</td><td class='encabezado'>Tucumán</td><td class='encabezado'>Total</td></tr><tr><td class='total'>Ene<td class='zebra'>422</td><td class='zebra'>62</td><td class='zebra'>9</td><td class='zebra'>2</td><td class='zebra'>1</td><td class='zebra'>148</td><td class='zebra'>1</td><td class='zebra'>69</td><td class='zebra'>1</td><td class='zebra'>11</td><td class='zebra'>8</td><td class='zebra'>3</td><td class='zebra'>64</td><td class='zebra'>1</td><td class='zebra'>9</td><td class='zebra'>5</td><td class='zebra'>49</td><td class='zebra'>17</td><td class='zebra'>12</td><td class='zebra'>0</td><td class='zebra'>188</td><td class='zebra'>16</td><td class='zebra'>0</td><td class='zebra'>45</td><td class='total'>1143</td></tr></tr><tr><td class='total'>Feb<td class=''>398</td><td class=''>32</td><td class=''>5</td><td class=''>0</td><td class=''>3</td><td class=''>117</td><td class=''>0</td><td class=''>37</td><td class=''>0</td><td class=''>12</td><td class=''>17</td><td class=''>2</td><td class=''>55</td><td class=''>1</td><td class=''>7</td><td class=''>13</td><td class=''>36</td><td class=''>14</td><td class=''>11</td><td class=''>0</td><td class=''>153</td><td class=''>16</td><td class=''>0</td><td class=''>53</td><td class='total'>982</td></tr></tr><tr><td class='total'>Mar<td class='zebra'>395</td><td class='zebra'>34</td><td class='zebra'>11</td><td class='zebra'>0</td><td class='zebra'>1</td><td class='zebra'>138</td><td class='zebra'>3</td><td class='zebra'>44</td><td class='zebra'>0</td><td class='zebra'>11</td><td class='zebra'>11</td><td class='zebra'>2</td><td class='zebra'>47</td><td class='zebra'>0</td><td class='zebra'>3</td><td class='zebra'>4</td><td class='zebra'>28</td><td class='zebra'>15</td><td class='zebra'>11</td><td class='zebra'>1</td><td class='zebra'>139</td><td class='zebra'>13</td><td class='zebra'>1</td><td class='zebra'>30</td><td class='total'>942</td></tr></tr><tr><td class='total'>Abr<td class=''>332</td><td class=''>19</td><td class=''>9</td><td class=''>1</td><td class=''>0</td><td class=''>110</td><td class=''>1</td><td class=''>43</td><td class=''>0</td><td class=''>8</td><td class=''>11</td><td class=''>1</td><td class=''>47</td><td class=''>1</td><td class=''>2</td><td class=''>10</td><td class=''>27</td><td class=''>12</td><td class=''>13</td><td class=''>0</td><td class=''>116</td><td class=''>19</td><td class=''>1</td><td class=''>33</td><td class='total'>816</td></tr></tr></table>
+	<table>
+		<tr><td colspan='26'></td></tr>
+		<tr><td colspan='26'>FUENTE: Estos datos son los que posee el ENARGAS a partir de la información suministrada mensualmente, en forma electrónica, por los sujetos del sistema.</td></tr>
+	</table></body>
+</html>

@@ -1,0 +1,75 @@
+	<style type="text/css">
+	
+		td{
+			font-family: Calibri, Arial, "Helvetica Neue", Helvetica,  sans-serif;
+			font-size:12pt;
+			color:#000;
+			font-weight:normal;
+			text-align:center;
+		}
+		
+		
+		td.titulo1, h1{
+			font-size:26pt;
+			border:none;
+			font-weight:bold;
+		}
+		h1{ color:#0695d6; }
+		td.titulo1{	background-color:#0695d6; color:#fff; }
+		
+		
+		td.titulo2, h2{
+			font-size:15pt;
+			border:none;
+			color:#0695d6;
+			font-weight:bold;
+		}
+
+		td.encabezado, th.CT1{
+			font-weight:bold;
+			background-color:#5bc0de;
+			color:#fff;
+		}
+		
+		table.datos,  th,  td {
+			border: 0.5pt solid #ccc;
+			border-collapse: collapse;			
+		}
+		
+
+		td.zebra, td.CDR, tr.CDR td{
+			background-color:#eee;
+		}
+
+		
+		td.total, tr.CT2 td{
+			font-weight:bold;
+			background-color:#ccc;
+			color:#000;		
+		}	
+			
+		.left{
+			text-align: left;
+		}
+		
+		.right{
+			text-align: right;
+		}
+
+	</style>
+	
+	<table width='100%'>
+			<tr><td class='titulo1' colspan='26'> Datos Operativos GNC</td></tr>
+			<tr><td class='titulo2' colspan='26'></td></tr> 
+			<tr><td class='titulo2' colspan='26'></td></tr>
+			<tr><td class='titulo2' colspan='26'>Total de revisiones peri&oacute;dicas de  veh&iacute;culos habilitados discriminado por mes y provincia - A&ntilde;o 2025</td></tr>
+		</table>
+		<br />
+		<br />
+		<br /><table class='datos' width='100%'>
+			<tr><td class='encabezado'>Mes</td><td class='encabezado'>Buenos<BR>Aires</td><td class='encabezado'>Capital<BR>Federal</td><td class='encabezado'>Catamarca</td><td class='encabezado'>Chaco</td><td class='encabezado'>Chubut</td><td class='encabezado'>Córdoba</td><td class='encabezado'>Corrientes</td><td class='encabezado'>Entre<BR>Ríos</td><td class='encabezado'>Formosa</td><td class='encabezado'>Jujuy</td><td class='encabezado'>La<BR>Pampa</td><td class='encabezado'>La<BR>Rioja</td><td class='encabezado'>Mendoza</td><td class='encabezado'>Misiones</td><td class='encabezado'>Neuquén</td><td class='encabezado'>Río<BR>Negro</td><td class='encabezado'>Salta</td><td class='encabezado'>San<BR>Juan</td><td class='encabezado'>San<BR>Luis</td><td class='encabezado'>Santa<BR>Cruz</td><td class='encabezado'>Santa<BR>Fe</td><td class='encabezado'>Sgo. del<BR>Estero</td><td class='encabezado'>T. del<BR>Fuego</td><td class='encabezado'>Tucumán</td><td class='encabezado'>Total</td></tr><tr><td class='total'>Ene<td class='zebra'>45454</td><td class='zebra'>2181</td><td class='zebra'>572</td><td class='zebra'>17</td><td class='zebra'>46</td><td class='zebra'>15342</td><td class='zebra'>48</td><td class='zebra'>2051</td><td class='zebra'>10</td><td class='zebra'>1379</td><td class='zebra'>138</td><td class='zebra'>36</td><td class='zebra'>5754</td><td class='zebra'>13</td><td class='zebra'>117</td><td class='zebra'>314</td><td class='zebra'>2119</td><td class='zebra'>1771</td><td class='zebra'>2053</td><td class='zebra'>15</td><td class='zebra'>7324</td><td class='zebra'>1089</td><td class='zebra'>38</td><td class='zebra'>2912</td><td class='total'>90793</td></tr></tr><tr><td class='total'>Feb<td class=''>38779</td><td class=''>2042</td><td class=''>490</td><td class=''>11</td><td class=''>44</td><td class=''>13259</td><td class=''>40</td><td class=''>1818</td><td class=''>9</td><td class=''>1081</td><td class=''>124</td><td class=''>118</td><td class=''>5648</td><td class=''>8</td><td class=''>119</td><td class=''>299</td><td class=''>2082</td><td class=''>1660</td><td class=''>1608</td><td class=''>10</td><td class=''>6617</td><td class=''>878</td><td class=''>18</td><td class=''>2987</td><td class='total'>79749</td></tr></tr><tr><td class='total'>Mar<td class='zebra'>41882</td><td class='zebra'>2134</td><td class='zebra'>475</td><td class='zebra'>17</td><td class='zebra'>43</td><td class='zebra'>15144</td><td class='zebra'>38</td><td class='zebra'>2065</td><td class='zebra'>6</td><td class='zebra'>1168</td><td class='zebra'>150</td><td class='zebra'>129</td><td class='zebra'>6209</td><td class='zebra'>14</td><td class='zebra'>99</td><td class='zebra'>313</td><td class='zebra'>2200</td><td class='zebra'>1838</td><td class='zebra'>1750</td><td class='zebra'>15</td><td class='zebra'>6962</td><td class='zebra'>1024</td><td class='zebra'>21</td><td class='zebra'>3376</td><td class='total'>87072</td></tr></tr><tr><td class='total'>Abr<td class=''>33763</td><td class=''>1746</td><td class=''>361</td><td class=''>16</td><td class=''>32</td><td class=''>12361</td><td class=''>27</td><td class=''>1636</td><td class=''>10</td><td class=''>1090</td><td class=''>135</td><td class=''>112</td><td class=''>5004</td><td class=''>12</td><td class=''>76</td><td class=''>192</td><td class=''>1999</td><td class=''>1673</td><td class=''>1466</td><td class=''>9</td><td class=''>5913</td><td class=''>814</td><td class=''>22</td><td class=''>2865</td><td class='total'>71334</td></tr></tr></table>
+	<table>
+		<tr><td colspan='26'></td></tr>
+		<tr><td colspan='26'>FUENTE: Estos datos son los que posee el ENARGAS a partir de la información suministrada mensualmente, en forma electrónica, por los sujetos del sistema.</td></tr>
+	</table></body>
+</html>
