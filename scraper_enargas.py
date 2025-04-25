@@ -7,7 +7,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
+# Cambio mínimo para activar GitHub Actions
 def descargar_estadisticas():
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
