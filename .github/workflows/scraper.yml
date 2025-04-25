@@ -3,10 +3,10 @@ name: Descargar archivos ENARGAS
 on:
   schedule:
     - cron: '0 9 * * *'  # Todos los días a las 6 AM Argentina
-  workflow_dispatch:  # Permite ejecutarlo manualmente
+  workflow_dispatch:
 
 permissions:
-  contents: write  # 👈 Necesario para permitir commits automáticos
+  contents: write
 
 jobs:
   run-scraper:
@@ -35,3 +35,9 @@ jobs:
         git commit -m "📊 Archivos descargados automáticamente" || echo "Nada para commitear"
         git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
         git push origin HEAD:main
+
+    - name: Subir archivos a Google Drive
+      env:
+        GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+      run: |
+        python upload_to_drive.py
