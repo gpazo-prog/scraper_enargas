@@ -5,6 +5,9 @@ on:
     - cron: '0 9 * * *'  # Todos los días a las 6 AM Argentina
   workflow_dispatch:  # Permite ejecutarlo manualmente
 
+permissions:
+  contents: write  # 👈 Necesario para permitir commits automáticos
+
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
@@ -30,11 +33,5 @@ jobs:
         git config --global user.email "actions@github.com"
         git add descargas_enargas/*.xls || echo "Nada para agregar"
         git commit -m "📊 Archivos descargados automáticamente" || echo "Nada para commitear"
-        git push
-      env:
-        GIT_AUTHOR_NAME: github-actions
-        GIT_AUTHOR_EMAIL: actions@github.com
-        GIT_COMMITTER_NAME: github-actions
-        GIT_COMMITTER_EMAIL: actions@github.com
-        # Este token permite hacer push
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        git push origin HEAD:main
