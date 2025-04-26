@@ -28,14 +28,14 @@ jobs:
       run: |
         python scraper_enargas.py
 
-    - name: Subir archivos al repo
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "actions@github.com"
-        git add descargas_enargas/*.xls || echo "Nada para agregar"
-        git commit -m "📊 Archivos descargados automáticamente" || echo "Nada para commitear"
-        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-        git push origin HEAD:main
+#    - name: Subir archivos al repo
+#      run: |
+#        git config --global user.name "github-actions"
+#        git config --global user.email "actions@github.com"
+#        git add descargas_enargas/*.xls || echo "Nada para agregar"
+#        git commit -m "📊 Archivos descargados automáticamente" || echo "Nada para commitear"
+#        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+#        git push origin HEAD:main
 
     - name: Subir archivos a Google Drive
       env:
