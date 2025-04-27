@@ -5,3 +5,4 @@ supabase
 pandas
 openpyxl
 xlrd        # para leer .xls
+lxml         # parser de HTML para pd.read_html
