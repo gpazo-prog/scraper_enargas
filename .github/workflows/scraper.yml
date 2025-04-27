@@ -1,20 +1,21 @@
-name: Ingest ENARGAS Stats
+name: ENARGAS Full Pipeline
 
 on:
   schedule:
-    - cron: '0 9 * * *'   # Todos los días a las 6 AM ARG (09:00 UTC)
+    - cron: '0 9 * * *'   # 06:00 ART (09:00 UTC)
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  ingest:
+  full-pipeline:
     runs-on: ubuntu-latest
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      SUPABASE_URL:     ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY:     ${{ secrets.SUPABASE_KEY }}
       GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -32,7 +33,7 @@ jobs:
       - name: Instalar Chrome para Selenium
         uses: browser-actions/setup-chrome@v1
 
-      - name: Ejecutar scraper + carga en Supabase
+      - name: Ejecutar ingest (scraper + Supabase)
         run: python scripts/ingest.py
 
       - name: Subir archivos a Google Drive
