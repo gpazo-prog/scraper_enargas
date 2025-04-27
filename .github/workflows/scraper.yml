@@ -1,40 +1,44 @@
-name: ENARGAS Full Pipeline
+name: Descargar archivos ENARGAS
 
 on:
   schedule:
-    - cron: '0 9 * * *'   # 06:00 ART (09:00 UTC)
+    - cron: '0 9 * * *'  # Todos los días a las 6 AM Argentina
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  full-pipeline:
+  run-scraper:
     runs-on: ubuntu-latest
-    env:
-      SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
-      GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
 
     steps:
-      - name: Checkout del repositorio
-        uses: actions/checkout@v4
+    - name: Checkout del repositorio
+      uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+    - name: Instalar dependencias Python
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Instalar dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+    - name: Instalar Chrome (rápido)
+      uses: browser-actions/setup-chrome@v1
 
-      - name: Instalar Chrome para Selenium
-        uses: browser-actions/setup-chrome@v1
+    - name: Ejecutar el scraper
+      run: |
+        python scraper_enargas.py
 
-      - name: Ejecutar scraper + carga en Supabase
-        run: python ingest.py
+    - name: Subir archivos al repo
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "actions@github.com"
+        git add descargas_enargas/*.xls || echo "Nada para agregar"
+        git commit -m "📊 Archivos descargados automáticamente" || echo "Nada para commitear"
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        git push origin HEAD:main
 
-      - name: Subir archivos a Google Drive
-        run: python upload_to_drive.py
+    - name: Subir archivos a Google Drive
+      env:
+        GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+      run: |
+        python upload_to_drive.py
