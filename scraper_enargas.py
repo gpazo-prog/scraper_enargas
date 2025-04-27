@@ -17,14 +17,14 @@ def fetch_excels() -> dict[str, pd.DataFrame]:
     """
     Ejecuta el scraping de ENARGAS:
       1) Descarga via Selenium los 6 archivos .xls* a descargas_enargas/
-      2) Lee cada Excel con pandas en un DataFrame
+      2) Lee cada Excel con pandas en un DataFrame (especificando engine)
       3) Devuelve un dict { nombre_archivo: DataFrame }
     """
     # 1) Preparar carpeta de descargas
     download_dir = os.path.abspath("descargas_enargas")
     os.makedirs(download_dir, exist_ok=True)
 
-    # 2) Configurar Chrome en modo headless y con carpeta de descarga
+    # 2) Configurar Chrome en modo headless y carpeta de descarga
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
@@ -63,31 +63,53 @@ def fetch_excels() -> dict[str, pd.DataFrame]:
             btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
             btn.click()
             print(f"✅ Descargando: {cuadro}")
-            time.sleep(2)  # tiempo para que termine la descarga
+            time.sleep(2)  # espera que termine la descarga
         except Exception as e:
-            print(f"❌ Error al descargar: {cuadro}", e)
+            print(f"❌ Error al descargar '{cuadro}': {e}")
 
     driver.quit()
     print("✔️ Descargas finalizadas.")
 
     # 5) Leer los archivos descargados en memoria
     dfs: dict[str, pd.DataFrame] = {}
-    for filepath in glob.glob(os.path.join(download_dir, "*.xls*")):
+    patrón = os.path.join(download_dir, "*.xls*")
+    for filepath in glob.glob(patrón):
         nombre = os.path.basename(filepath)
+        ext = os.path.splitext(nombre)[1].lower()
+        # Selección de engine según extensión
+        if ext == ".xls":
+            engine = "xlrd"
+        elif ext in (".xlsx", ".xlsm", ".xlsb"):
+            engine = "openpyxl"
+        else:
+            engine = None
+
         try:
-            df = pd.read_excel(filepath, header=0, index_col=0)
+            if engine:
+                df = pd.read_excel(
+                    filepath,
+                    header=0,
+                    index_col=0,
+                    engine=engine
+                )
+            else:
+                df = pd.read_excel(
+                    filepath,
+                    header=0,
+                    index_col=0
+                )
             dfs[nombre] = df
+            print(f"📥 Leído: {nombre} (engine={engine or 'auto'})")
         except Exception as e:
-            print(f"❌ Error al leer {nombre}: {e}")
+            print(f"❌ Error al leer '{nombre}': {e}")
 
     # 6) (Opcional) limpiar la carpeta de descargas
-    # for filepath in glob.glob(os.path.join(download_dir, "*.xls*")):
+    # for filepath in glob.glob(patrón):
     #     os.remove(filepath)
 
     return dfs
 
 
 if __name__ == "__main__":
-    # Prueba local
     archivos = fetch_excels()
     print(f"Se descargaron y cargaron {len(archivos)} archivos en memoria.")
