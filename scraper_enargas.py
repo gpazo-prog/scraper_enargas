@@ -13,31 +13,49 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 
+def _wait_for_download(download_dir: str, timeout: int = 30):
+    """
+    Espera hasta que aparezca un nuevo archivo *.xls* sin extensión .crdownload.
+    """
+    patrón = os.path.join(download_dir, "*.xls*")
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        archivos = glob.glob(patrón)
+        # descartamos temporales de Chrome (crdownload)
+        completos = [f for f in archivos if not f.endswith(".crdownload")]
+        if completos:
+            # devolvemos el path del archivo más reciente
+            return max(completos, key=os.path.getmtime)
+        time.sleep(1)
+    raise TimeoutError(f"Timeout: no se terminó de descargar en {timeout}s")
+
+
 def fetch_excels() -> dict[str, pd.DataFrame]:
     """
-    Ejecuta el scraping de ENARGAS:
-      1) Descarga via Selenium los 6 archivos .xls* a descargas_enargas/
-      2) Lee cada Excel con pandas en un DataFrame (especificando engine)
-      3) Devuelve un dict { nombre_archivo: DataFrame }
+    1) Descarga con Selenium los 6 .xls* a descargas_enargas/
+    2) Espera a que termine cada descarga
+    3) Lee cada archivo en memoria, detectando si es Excel o HTML
+    4) Devuelve { nombre_archivo: DataFrame }
     """
-    # 1) Preparar carpeta de descargas
     download_dir = os.path.abspath("descargas_enargas")
     os.makedirs(download_dir, exist_ok=True)
 
-    # 2) Configurar Chrome en modo headless y carpeta de descarga
+    # Limpiar previos
+    for f in glob.glob(os.path.join(download_dir, "*.xls*")):
+        os.remove(f)
+
+    # Configuración de Chrome
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920x1080")
     prefs = {"download.default_directory": download_dir}
     options.add_experimental_option("prefs", prefs)
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 15)
 
-    # 3) Navegar a la página y seleccionar parámetros
     driver.get("https://www.enargas.gov.ar/secciones/gas-natural-comprimido/estadisticas.php")
 
     Select(wait.until(EC.presence_of_element_located((By.ID, "tipo-consulta-gnc")))) \
@@ -54,62 +72,52 @@ def fetch_excels() -> dict[str, pd.DataFrame]:
         "Cilindro de GNC revisiones CRPC"
     ]
 
-    # 4) Descargar cada Excel
+    descargados = []
     for cuadro in cuadros:
-        try:
-            wait.until(EC.text_to_be_present_in_element((By.ID, "cuadro"), cuadro))
-            Select(wait.until(EC.presence_of_element_located((By.ID, "cuadro")))) \
-                .select_by_visible_text(cuadro)
-            btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
-            btn.click()
-            print(f"✅ Descargando: {cuadro}")
-            time.sleep(2)  # espera que termine la descarga
-        except Exception as e:
-            print(f"❌ Error al descargar '{cuadro}': {e}")
+        wait.until(EC.text_to_be_present_in_element((By.ID, "cuadro"), cuadro))
+        Select(wait.until(EC.presence_of_element_located((By.ID, "cuadro")))) \
+            .select_by_visible_text(cuadro)
+        btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
+        btn.click()
+        # Esperamos a que termine la descarga y devolvemos el path
+        path = _wait_for_download(download_dir)
+        descargados.append(path)
+        print(f"✅ Descargado: {os.path.basename(path)}")
 
     driver.quit()
-    print("✔️ Descargas finalizadas.")
+    print("✔️ Todas las descargas terminadas.")
 
-    # 5) Leer los archivos descargados en memoria
+    # Leer en memoria
     dfs: dict[str, pd.DataFrame] = {}
-    patrón = os.path.join(download_dir, "*.xls*")
-    for filepath in glob.glob(patrón):
+    for filepath in descargados:
         nombre = os.path.basename(filepath)
         ext = os.path.splitext(nombre)[1].lower()
-        # Selección de engine según extensión
-        if ext == ".xls":
-            engine = "xlrd"
-        elif ext in (".xlsx", ".xlsm", ".xlsb"):
-            engine = "openpyxl"
-        else:
-            engine = None
 
-        try:
-            if engine:
-                df = pd.read_excel(
-                    filepath,
-                    header=0,
-                    index_col=0,
-                    engine=engine
-                )
-            else:
-                df = pd.read_excel(
-                    filepath,
-                    header=0,
-                    index_col=0
-                )
-            dfs[nombre] = df
-            print(f"📥 Leído: {nombre} (engine={engine or 'auto'})")
-        except Exception as e:
-            print(f"❌ Error al leer '{nombre}': {e}")
+        # Intento de lectura Excel
+        df = None
+        for engine in ({"xlrd"} if ext == ".xls" else {"openpyxl"}):
+            try:
+                df = pd.read_excel(filepath, header=0, index_col=0, engine=engine)
+                print(f"📥 Leído (Excel, engine={engine}): {nombre}")
+                break
+            except Exception:
+                df = None
 
-    # 6) (Opcional) limpiar la carpeta de descargas
-    # for filepath in glob.glob(patrón):
-    #     os.remove(filepath)
+        # Si no es un Excel válido, lo parseo como HTML
+        if df is None:
+            try:
+                tables = pd.read_html(filepath, header=0, index_col=0)
+                df = tables[0]
+                print(f"📥 Leído (HTML fallback): {nombre}")
+            except Exception as e:
+                print(f"❌ No pude leer {nombre} ni como Excel ni como HTML: {e}")
+                continue
+
+        dfs[nombre] = df
 
     return dfs
 
 
 if __name__ == "__main__":
     archivos = fetch_excels()
-    print(f"Se descargaron y cargaron {len(archivos)} archivos en memoria.")
+    print(f"Se cargaron {len(archivos)} DataFrames en memoria.")
