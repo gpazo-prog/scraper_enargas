@@ -4,3 +4,4 @@ pydrive2
 supabase
 pandas
 openpyxl
+xlrd        # para leer .xls
