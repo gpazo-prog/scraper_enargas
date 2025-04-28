@@ -2,7 +2,7 @@ name: Descargar archivos ENARGAS
 
 on:
   schedule:
-    - cron: '10 11 * * *'  # Todos los días a las 8:10 AM Argentina
+    - cron: '0 9 * * *'  # Todos los días a las 6 AM Argentina
   workflow_dispatch:
 
 permissions:
