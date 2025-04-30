@@ -42,3 +42,15 @@ jobs:
         GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
       run: |
         python upload_to_drive.py
+
+
+    - name: Cargar datos en Supabase
+      env: 
+         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      run: |
+         python procesar_a_db.py
+
+    
+
+
+        
