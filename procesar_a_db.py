@@ -6,6 +6,7 @@ import re
 import pandas as pd
 import psycopg2
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 # — Función para detectar HTML “camuflado” en .xls de ENARGAS —
 def es_html_camuflado(path):
@@ -15,10 +16,21 @@ def es_html_camuflado(path):
 
 # — Conexión a la base Postgres de Supabase —
 def conectar_db():
-    url = os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("Falta la variable de entorno DATABASE_URL")
-    return psycopg2.connect(url)
+    url = os.getenv("SUPABASE_URL")
+    pwd = os.getenv("SUPABASE_KEY")
+    if not url or not pwd:
+        raise RuntimeError("Falta SUPABASE_URL o SUPABASE_KEY en el entorno")
+
+    # parseamos la URL sin contraseña
+    parsed = urlparse(url)
+    return psycopg2.connect(
+        host     = parsed.hostname,
+        port     = parsed.port,
+        dbname   = parsed.path.lstrip("/"),
+        user     = parsed.username,
+        password = pwd,
+        sslmode  = "require"
+    )
 
 # — Carga los catálogos de prácticas y provincias a dicts —
 def cargar_catalogos(cur):
