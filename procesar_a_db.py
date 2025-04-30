@@ -18,6 +18,7 @@ def es_html_camuflado(path):
 def conectar_db():
     url = os.getenv("SUPABASE_URL")
     pwd = os.getenv("SUPABASE_KEY")
+    print(f">>> conectar_db(): URL={url}  USER={urlparse(url).username}", flush=True)
     if not url or not pwd:
         raise RuntimeError("Falta SUPABASE_URL o SUPABASE_KEY en el entorno")
 
@@ -30,6 +31,7 @@ def conectar_db():
         user     = parsed.username,
         password = pwd,
         sslmode  = "require"
+        connect_timeout=20 
     )
 
 # — Carga los catálogos de prácticas y provincias a dicts —
@@ -42,8 +44,10 @@ def cargar_catalogos(cur):
 
 # — Main: procesa cada .xls y vuelca la última fila a la tabla estadisticas_diarias —
 def procesar():
+    print(">>> Inicio procesar()", flush=True)
     carpeta = "descargas_enargas"
     conn = conectar_db()
+    print(">>> Conectado OK", flush=True)
     cur  = conn.cursor()
     practicas, provincias = cargar_catalogos(cur)
 
@@ -54,6 +58,7 @@ def procesar():
     pattern = re.compile(r"^([a-z\-]+)-(\d{8})-\d{6}\.xls$", re.IGNORECASE)
 
     for archivo in os.listdir(carpeta):
+        print(f">>> Procesando archivo: {archivo}", flush=True)
         if not archivo.lower().endswith(".xls"):
             continue
         m = pattern.match(archivo)
@@ -108,10 +113,13 @@ def procesar():
                 ON CONFLICT(practica_id, provincia_id, fecha)
                 DO UPDATE SET acumulado = EXCLUDED.acumulado
             """, (practica_id, provincia_id, fecha_datos, acumulado))
-
+            print(f">>> Insertados datos de {archivo}", flush=True)
+            
+    print(">>> Commit y cierre", flush=True)        
     conn.commit()
     cur.close()
     conn.close()
-
+    print(">>> Fin procesar()", flush=True)
+    
 if __name__ == "__main__":
     procesar()
