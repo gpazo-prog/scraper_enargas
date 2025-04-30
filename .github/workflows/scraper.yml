@@ -45,8 +45,9 @@ jobs:
 
 
     - name: Cargar datos en Supabase
-      env: 
-         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      env:
+        DATABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY:  ${{ secrets.SUPABASE_KEY }}
       run: |
          python procesar_a_db.py
 
