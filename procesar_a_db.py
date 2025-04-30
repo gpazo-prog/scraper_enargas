@@ -34,7 +34,7 @@ def conectar_db():
         password = pwd,
         sslmode  = "require",
         connect_timeout = 20
-
+    )
 
 # esta funciono 2 veces y una no
 #def conectar_db():
