@@ -120,7 +120,7 @@ def procesar():
             #print(f">>> UPSERT -> practica_id={practica_id}, provincia_id={provincia_id}, fecha={fecha_datos}, acumulado={acumulado}", flush=True)
 
 
-            # insertar con upsert
+            # insertar con upsert y si hay una fila con igual practica_id, provincia_id y fecha lo pisa con el nuevo dato
             cur.execute("""
                 INSERT INTO estadisticas_diarias
                   (practica_id, provincia_id, fecha, acumulado)
@@ -128,6 +128,16 @@ def procesar():
                 ON CONFLICT(practica_id, provincia_id, fecha)
                 DO UPDATE SET acumulado = EXCLUDED.acumulado
             """, (practica_id, provincia_id, fecha_datos, acumulado))
+            
+            # insertar con upsert y si hay una fila con igual practica_id, provincia_id y fecha no hace nada
+            #cur.execute("""
+            #    INSERT INTO estadisticas_diarias
+            #      (practica_id, provincia_id, fecha, acumulado)
+            #    VALUES (%s, %s, %s, %s)
+            #    ON CONFLICT(practica_id, provincia_id, fecha)
+            #    DO NOTHING;
+            #""", (practica_id, provincia_id, fecha_datos, acumulado))
+            
             print(f"✅ Insertados datos de {archivo}", flush=True)
             
     print(">>> Commit y cierre", flush=True)        
