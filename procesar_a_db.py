@@ -39,6 +39,7 @@ def conectar_db():
     if not dsn:
         raise RuntimeError("Falta la variable de entorno DATABASE_URL")
     # Conecta directamente usando el DSN completo
+    print(">>> conectar_db():" )
     return psycopg2.connect(dsn, sslmode="require", connect_timeout=20)
 
 # — Carga los catálogos de prácticas y provincias a dicts —
