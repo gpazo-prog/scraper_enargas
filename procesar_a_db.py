@@ -30,7 +30,7 @@ def conectar_db():
         dbname   = parsed.path.lstrip("/"),
         user     = parsed.username,
         password = pwd,
-        sslmode  = "require"
+        sslmode  = "require",
         connect_timeout=20 
     )
 
