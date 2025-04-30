@@ -14,33 +14,36 @@ def es_html_camuflado(path):
         inicio = f.read(1024).lower()
     return any(tag in inicio for tag in (b'<html', b'<table', b'<!doctype html'))
 
-# — Conexión a la base Postgres de Supabase —
-#def conectar_db():
-#    url = os.getenv("SUPABASE_URL")
-#    pwd = os.getenv("SUPABASE_KEY")
-#    print(f">>> conectar_db(): URL={url}  USER={urlparse(url).username}", flush=True)
-#    if not url or not pwd:
-#        raise RuntimeError("Falta SUPABASE_URL o SUPABASE_KEY en el entorno")
-#
-#    # parseamos la URL sin contraseña
-#    parsed = urlparse(url)
-#    return psycopg2.connect(
-#        host     = parsed.hostname,
-#        port     = parsed.port,
-#        dbname   = parsed.path.lstrip("/"),
-#        user     = parsed.username,
-#        password = pwd,
-#        sslmode  = "require",
-#        connect_timeout=20 
-#    )
 
 def conectar_db():
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("Falta la variable de entorno DATABASE_URL")
-    # Conecta directamente usando el DSN completo
-    #print(">>> conectar_db():" )
-    return psycopg2.connect(dsn, sslmode="require", connect_timeout=20)
+    url = os.getenv("SUPABASE_URL")
+    pwd = os.getenv("SUPABASE_KEY")
+    
+    print(f">>> conectar_db(): URL={url}  USER={urlparse(url).username}", flush=True)
+
+    if not url or not pwd:
+        raise RuntimeError("Falta SUPABASE_URL o SUPABASE_KEY")
+        
+     # parseamos la URL sin contraseña   
+    parsed = urlparse(url)
+    return psycopg2.connect(
+        host     = parsed.hostname,
+        port     = parsed.port,
+        dbname   = parsed.path.lstrip("/"),
+        user     = parsed.username,
+        password = pwd,
+        sslmode  = "require",
+        connect_timeout = 20
+
+
+# esta funciono 2 veces y una no
+#def conectar_db():
+#    dsn = os.getenv("DATABASE_URL")
+#    if not dsn:
+#        raise RuntimeError("Falta la variable de entorno DATABASE_URL")
+#    # Conecta directamente usando el DSN completo
+#    #print(">>> conectar_db():" )
+#    return psycopg2.connect(dsn, sslmode="require", connect_timeout=20)
 
 # — Carga los catálogos de prácticas y provincias a dicts —
 def cargar_catalogos(cur):
