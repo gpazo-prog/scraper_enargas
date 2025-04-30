@@ -121,13 +121,13 @@ def procesar():
 
 
             # insertar con upsert
-            #cur.execute("""
-            #    INSERT INTO estadisticas_diarias
-            #      (practica_id, provincia_id, fecha, acumulado)
-            #    VALUES (%s, %s, %s, %s)
-            #    ON CONFLICT(practica_id, provincia_id, fecha)
-            #    DO UPDATE SET acumulado = EXCLUDED.acumulado
-            #""", (practica_id, provincia_id, fecha_datos, acumulado))
+            cur.execute("""
+                INSERT INTO estadisticas_diarias
+                  (practica_id, provincia_id, fecha, acumulado)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT(practica_id, provincia_id, fecha)
+                DO UPDATE SET acumulado = EXCLUDED.acumulado
+            """, (practica_id, provincia_id, fecha_datos, acumulado))
             print(f"✅ Insertados datos de {archivo}", flush=True)
             
     print(">>> Commit y cierre", flush=True)        
