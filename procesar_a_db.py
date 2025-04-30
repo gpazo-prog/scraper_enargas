@@ -46,7 +46,7 @@ def cargar_catalogos(cur):
 def procesar():
     print(">>> Inicio procesar()", flush=True)
     carpeta = "descargas_enargas"
-    #conn = conectar_db()
+    conn = conectar_db()
     print(">>> Conectado OK", flush=True)
     cur  = conn.cursor()
     practicas, provincias = cargar_catalogos(cur)
