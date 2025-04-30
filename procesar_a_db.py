@@ -39,7 +39,7 @@ def conectar_db():
     if not dsn:
         raise RuntimeError("Falta la variable de entorno DATABASE_URL")
     # Conecta directamente usando el DSN completo
-    print(">>> conectar_db():" )
+    #print(">>> conectar_db():" )
     return psycopg2.connect(dsn, sslmode="require", connect_timeout=20)
 
 # — Carga los catálogos de prácticas y provincias a dicts —
@@ -52,10 +52,10 @@ def cargar_catalogos(cur):
 
 # — Main: procesa cada .xls y vuelca la última fila a la tabla estadisticas_diarias —
 def procesar():
-    print(">>> Inicio procesar()", flush=True)
+    #print(">>> Inicio procesar()", flush=True)
     carpeta = "descargas_enargas"
     conn = conectar_db()
-    print(">>> Conectado OK", flush=True)
+    print("✅ Conectado a la DB OK", flush=True)
     cur  = conn.cursor()
     practicas, provincias = cargar_catalogos(cur)
 
@@ -114,7 +114,7 @@ def procesar():
             acumulado = int(val) if pd.notna(val) else 0
              
             # === Aquí añadimos el print de depuración ===
-            print(f">>> UPSERT -> practica_id={practica_id}, provincia_id={provincia_id}, fecha={fecha_datos}, acumulado={acumulado}", flush=True)
+            #print(f">>> UPSERT -> practica_id={practica_id}, provincia_id={provincia_id}, fecha={fecha_datos}, acumulado={acumulado}", flush=True)
 
 
             # insertar con upsert
@@ -125,7 +125,7 @@ def procesar():
             #    ON CONFLICT(practica_id, provincia_id, fecha)
             #    DO UPDATE SET acumulado = EXCLUDED.acumulado
             #""", (practica_id, provincia_id, fecha_datos, acumulado))
-            print(f">>> Insertados datos de {archivo}", flush=True)
+            print(f"✅ Insertados datos de {archivo}", flush=True)
             
     print(">>> Commit y cierre", flush=True)        
     conn.commit()
