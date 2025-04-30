@@ -51,7 +51,7 @@ jobs:
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
       run: |
-         python procesar_a_db.py
+         python -u procesar_a_db.py
 
     
 
