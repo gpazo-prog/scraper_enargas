@@ -37,11 +37,11 @@ jobs:
    #     git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
    #     git push origin HEAD:main
 
-    - name: Subir archivos a Google Drive
-      env:
-        GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
-      run: |
-        python upload_to_drive.py
+    #- name: Subir archivos a Google Drive
+    #  env:
+    #    GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+    #  run: |
+    #    python upload_to_drive.py
 
 
     - name: Cargar datos en Supabase
