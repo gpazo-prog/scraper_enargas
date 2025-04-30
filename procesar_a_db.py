@@ -104,15 +104,19 @@ def procesar():
                 continue
 
             acumulado = int(val) if pd.notna(val) else 0
+             
+            # === Aquí añadimos el print de depuración ===
+            print(f">>> UPSERT -> practica_id={practica_id}, provincia_id={provincia_id}, fecha={fecha_datos}, acumulado={acumulado}", flush=True)
+
 
             # insertar con upsert
-            cur.execute("""
-                INSERT INTO estadisticas_diarias
-                  (practica_id, provincia_id, fecha, acumulado)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT(practica_id, provincia_id, fecha)
-                DO UPDATE SET acumulado = EXCLUDED.acumulado
-            """, (practica_id, provincia_id, fecha_datos, acumulado))
+            #cur.execute("""
+            #    INSERT INTO estadisticas_diarias
+            #      (practica_id, provincia_id, fecha, acumulado)
+            #    VALUES (%s, %s, %s, %s)
+            #    ON CONFLICT(practica_id, provincia_id, fecha)
+            #    DO UPDATE SET acumulado = EXCLUDED.acumulado
+            #""", (practica_id, provincia_id, fecha_datos, acumulado))
             print(f">>> Insertados datos de {archivo}", flush=True)
             
     print(">>> Commit y cierre", flush=True)        
