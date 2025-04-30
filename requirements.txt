@@ -1,4 +1,6 @@
 selenium
 webdriver-manager
 pydrive2
-
+pandas
+lxml
+psycopg2-binary
