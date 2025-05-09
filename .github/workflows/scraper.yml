@@ -23,7 +23,7 @@ jobs:
 
     - name: Instalar Chrome (rápido)
       uses: browser-actions/setup-chrome@v1
-
+# scraper descarga los xls de la pagina del enargas
     - name: Ejecutar el scraper
       run: |
         python scraper_enargas.py
@@ -36,14 +36,15 @@ jobs:
    #     git commit -m "📊 Archivos descargados automáticamente" || echo "Nada para commitear"
    #     git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
    #     git push origin HEAD:main
-
+   
+# upload_to_drive sube los xls de la pagina del enargas a un gdrive
     - name: Subir archivos a Google Drive
       env:
         GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
       run: |
         python upload_to_drive.py
 
-
+# procesar_a_db carga los valores de los excel en la DB de supabase
     - name: Cargar datos en Supabase
       env:
      #   DATABASE_URL: ${{ secrets.DATABASE_URL }}
