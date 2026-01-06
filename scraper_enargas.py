@@ -31,7 +31,7 @@ def descargar_estadisticas():
     Select(wait.until(EC.presence_of_element_located((By.ID, "tipo-consulta-gnc"))))\
         .select_by_visible_text("Prácticas informadas por Tipo de Operación")
     Select(wait.until(EC.presence_of_element_located((By.ID, "periodo"))))\
-        .select_by_visible_text("2025")
+        .select_by_visible_text("2026")
 
     cuadros = [
         "Conversiones de vehículos",
