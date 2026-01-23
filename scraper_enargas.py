@@ -92,8 +92,9 @@ def esperar_descarga_nueva(download_dir: str, antes: set, timeout=120):
 
 
 def configurar_formulario(driver, wait, periodo: str):
+    print("🌐 Abriendo URL ENARGAS...", flush=True)
     driver.get(URL)
-
+    print("✅ Página cargada", flush=True)
     Select(wait.until(EC.presence_of_element_located((By.ID, "tipo-consulta-gnc")))) \
         .select_by_visible_text("Prácticas informadas por Tipo de Operación")
 
@@ -107,7 +108,7 @@ def configurar_formulario(driver, wait, periodo: str):
     prev = str(int(periodo) - 1)
     if prev in opciones:
         periodo_select.select_by_visible_text(prev)
-        print(f"⚠️ El año {periodo} no está disponible. Fallback a {prev}.")
+        print(f"⚠️ El año {periodo} no está disponible. Fallback a {prev}.", flush=True)
         return prev
 
     raise ValueError(f"No encontré {periodo} ni {prev} en 'periodo'. Opciones: {opciones}")
@@ -115,7 +116,7 @@ def configurar_formulario(driver, wait, periodo: str):
 
 def descargar_estadisticas():
     periodo = str(datetime.now().year)
-    print(f"📅 Período objetivo: {periodo}")
+    print(f"📅 Período objetivo: {periodo}", flush=True)
 
     download_dir = os.path.abspath("descargas_enargas")
     os.makedirs(download_dir, exist_ok=True)
@@ -142,16 +143,20 @@ def descargar_estadisticas():
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
+    
+    driver.set_page_load_timeout(60)
+    print("✅ Chrome listo", flush=True)
+    
     configurar_descargas(driver, download_dir)
     wait = WebDriverWait(driver, 30)
 
     try:
         periodo_real = configurar_formulario(driver, wait, periodo)
-        print(f"✅ Período seleccionado: {periodo_real}")
+        print(f"✅ Período seleccionado: {periodo_real}", flush=True)
 
         for cuadro in CUADROS:
             tipo = TIPO_POR_CUADRO.get(cuadro, slugify(cuadro))
-            print(f"\n▶ Descargando: {cuadro}")
+            print(f"\n▶ Descargando: {cuadro}", flush=True)
 
             ok = False
             last_err = None
@@ -170,10 +175,13 @@ def descargar_estadisticas():
 
                     # Click real (ejecuta reCAPTCHA + submit como humano)
                     btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
+                    print("🖱️ Click en Ver Excel...", flush=True)
                     btn.click()
-
+                    
                     # Esperar descarga
+                    print("⏳ Esperando descarga...", flush=True)
                     descargado = esperar_descarga_nueva(download_dir, antes, timeout=120)
+                    print(f"✅ Descarga detectada: {descargado}", flush=True)
 
                     # Renombrar a formato viejo: tipo-YYYYMMDD-HHMMSS.xls
                     ts = datetime.now()
@@ -199,7 +207,7 @@ def descargar_estadisticas():
                             f.write(content)
                         raise RuntimeError(f"Archivo demasiado chico ({size} bytes). Probable error del servidor.")
 
-                    print(f"✅ OK: {os.path.basename(dst)} | {size} bytes")
+                    print(f"✅ OK: {os.path.basename(dst)} | {size} bytes", flush=True)
                     ok = True
                     time.sleep(1.2)
                     break
@@ -214,7 +222,7 @@ def descargar_estadisticas():
                 with open(f"debug/error_{tipo}_page.html", "w", encoding="utf-8") as f:
                     f.write(driver.page_source)
 
-                print(f"❌ Error definitivo en: {cuadro}")
+                print(f"❌ Error definitivo en: {cuadro}", flush=True)
                 print(repr(last_err))
 
         print("\n✔️ Descargas finalizadas.")
