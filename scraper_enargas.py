@@ -17,7 +17,7 @@ import requests
 
 URL = "https://www.enargas.gov.ar/secciones/gas-natural-comprimido/estadisticas.php"
 
-# ✅ Claves compatibles con tu pipeline viejo (procesar_a_db.py + tabla practicas)
+# ✅ Claves compatibles con tu pipeline (procesar_a_db.py + tabla practicas)
 TIPO_POR_CUADRO = {
     "Conversiones de vehículos": "conversiones",
     "Desmontajes de equipos en vehículos": "desmontajes",
@@ -66,6 +66,7 @@ def extraer_form_y_payload(driver, btn_elem):
     Encuentra el <form> ancestro del botón y arma:
     - action_url absoluto
     - payload (dict) con todos los name/value reales del form
+    + ✅ agrega name/value del botón presionado (clave para Excel)
     """
     form = btn_elem.find_element(By.XPATH, "ancestor::form")
     action = form.get_attribute("action") or ""
@@ -95,6 +96,18 @@ def extraer_form_y_payload(driver, btn_elem):
         name = ta.get_attribute("name")
         payload[name] = ta.get_attribute("value") or ta.text or ""
 
+    # ✅ IMPORTANTÍSIMO: incluir el submit del botón XLS (muchos backends lo usan)
+    btn_name = (btn_elem.get_attribute("name") or "").strip()
+    btn_value = (btn_elem.get_attribute("value") or "").strip()
+
+    # Si el botón no trae name/value, igual forzamos los campos que el PHP pide
+    # porque el error mostrado era: Undefined array key "Excel" y "action"
+    if btn_name and (btn_value or btn_value == ""):
+        payload[btn_name] = btn_value if btn_value != "" else "1"
+
+    payload.setdefault("Excel", "Excel")
+    payload.setdefault("action", "Excel")
+
     return action_url, payload
 
 
@@ -102,7 +115,7 @@ def requests_post_con_cookies(driver, url, payload, download_path):
     """
     Hace POST con requests usando cookies de Selenium.
     Guarda respuesta en download_path.
-    Devuelve (status_code, content_type, size_bytes)
+    Devuelve (status_code, content_type, size_bytes, first_bytes_text)
     """
     sess = requests.Session()
 
@@ -121,7 +134,26 @@ def requests_post_con_cookies(driver, url, payload, download_path):
     with open(download_path, "wb") as f:
         f.write(r.content)
 
-    return r.status_code, r.headers.get("Content-Type", ""), len(r.content)
+    head_text = ""
+    try:
+        head_text = r.content[:300].decode("utf-8", errors="ignore")
+    except Exception:
+        head_text = ""
+
+    return r.status_code, r.headers.get("Content-Type", ""), len(r.content), head_text
+
+
+def respuesta_es_error(head_text: str) -> bool:
+    ht = (head_text or "").lower()
+    # errores típicos que ya viste en 2026
+    return any(x in ht for x in [
+        "undefined array key",
+        "warning",
+        "la solicitud no pudo ser procesada",
+        "no pudo ser procesada correctamente",
+        "fatal error",
+        "deprecated:",
+    ])
 
 
 def descargar_estadisticas():
@@ -150,37 +182,52 @@ def descargar_estadisticas():
         for cuadro in cuadros:
             print(f"\n▶ Intentando: {cuadro}")
 
-            try:
-                configurar_formulario(driver, wait, periodo_real)
+            tipo_key = TIPO_POR_CUADRO[cuadro]
 
-                cuadro_elem = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
-                Select(cuadro_elem).select_by_visible_text(cuadro)
+            # ✅ reintentos (porque ENARGAS a veces responde “intente nuevamente”)
+            ok = False
+            last_err = None
 
-                btn = wait.until(EC.presence_of_element_located((By.ID, "btn-ver-xls")))
+            for intento in range(1, 4):
+                try:
+                    configurar_formulario(driver, wait, periodo_real)
 
-                action_url, payload = extraer_form_y_payload(driver, btn)
+                    cuadro_elem = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
+                    Select(cuadro_elem).select_by_visible_text(cuadro)
 
-                # ✅ Nombre compatible con el regex viejo: tipo-YYYYMMDD-HHMMSS.xls
-                tipo_key = TIPO_POR_CUADRO[cuadro]
-                ts = datetime.now()
-                fname = f"{tipo_key}-{ts:%Y%m%d}-{ts:%H%M%S}.xls"
-                out_path = os.path.join(download_dir, fname)
+                    btn = wait.until(EC.presence_of_element_located((By.ID, "btn-ver-xls")))
 
-                status, ctype, size = requests_post_con_cookies(driver, action_url, payload, out_path)
+                    action_url, payload = extraer_form_y_payload(driver, btn)
 
-                print(f"✅ Guardado: {fname} | status={status} | type={ctype} | bytes={size}")
+                    ts = datetime.now()
+                    fname = f"{tipo_key}-{ts:%Y%m%d}-{ts:%H%M%S}.xls"
+                    out_path = os.path.join(download_dir, fname)
 
-                # evita colisiones de HHMMSS + le da aire al server
-                time.sleep(1.1)
+                    status, ctype, size, head_text = requests_post_con_cookies(driver, action_url, payload, out_path)
 
-            except Exception as e:
+                    if status != 200 or respuesta_es_error(head_text):
+                        raise RuntimeError(
+                            f"Respuesta inválida (intento {intento}/3): status={status}, type={ctype}, bytes={size}"
+                        )
+
+                    print(f"✅ Guardado OK: {fname} | status={status} | type={ctype} | bytes={size}")
+                    ok = True
+                    time.sleep(1.1)  # evita colisiones de HHMMSS
+                    break
+
+                except Exception as e:
+                    last_err = e
+                    # backoff
+                    time.sleep(2 * intento)
+
+            if not ok:
                 os.makedirs("debug", exist_ok=True)
                 driver.save_screenshot(f"debug/error_{slugify(cuadro)}.png")
                 with open(f"debug/error_{slugify(cuadro)}.html", "w", encoding="utf-8") as f:
                     f.write(driver.page_source)
 
-                print(f"❌ Error en: {cuadro}")
-                print(repr(e))
+                print(f"❌ Error definitivo en: {cuadro}")
+                print(repr(last_err))
 
     finally:
         driver.quit()
