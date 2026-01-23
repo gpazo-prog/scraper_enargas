@@ -7,28 +7,26 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 import os
+import re
 import time
-from glob import glob
 from datetime import datetime
+from urllib.parse import urljoin
+
+import requests
 
 
 URL = "https://www.enargas.gov.ar/secciones/gas-natural-comprimido/estadisticas.php"
 
 
-def listar_xls(download_dir: str):
-    files = glob(os.path.join(download_dir, "*.xls"))
-    return sorted(files, key=os.path.getmtime)
-
-
-def esperar_nuevo_xls(download_dir: str, prev_set: set, timeout: int = 60):
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        actuales = set(glob(os.path.join(download_dir, "*.xls")))
-        nuevos = list(actuales - prev_set)
-        if nuevos:
-            return max(nuevos, key=os.path.getmtime)
-        time.sleep(1)
-    return None
+def slugify(txt: str) -> str:
+    txt = txt.lower()
+    txt = re.sub(r"[áàäâ]", "a", txt)
+    txt = re.sub(r"[éèëê]", "e", txt)
+    txt = re.sub(r"[íìïî]", "i", txt)
+    txt = re.sub(r"[óòöô]", "o", txt)
+    txt = re.sub(r"[úùüû]", "u", txt)
+    txt = re.sub(r"[^a-z0-9]+", "-", txt).strip("-")
+    return txt
 
 
 def configurar_formulario(driver, wait, periodo: str):
@@ -53,6 +51,72 @@ def configurar_formulario(driver, wait, periodo: str):
     raise ValueError(f"No encontré {periodo} ni {prev} en 'periodo'. Opciones: {opciones}")
 
 
+def extraer_form_y_payload(driver, btn_elem):
+    """
+    Encuentra el <form> ancestro del botón y arma:
+    - action_url absoluto
+    - payload (dict) con todos los name/value reales del form
+    """
+    form = btn_elem.find_element(By.XPATH, "ancestor::form")
+    action = form.get_attribute("action") or ""
+    action_url = urljoin(driver.current_url, action)
+
+    payload = {}
+
+    # inputs (incluye hidden/text/etc)
+    for inp in form.find_elements(By.XPATH, ".//input[@name]"):
+        name = inp.get_attribute("name")
+        itype = (inp.get_attribute("type") or "").lower()
+        if itype in ("checkbox", "radio"):
+            if inp.is_selected():
+                payload[name] = inp.get_attribute("value") or "on"
+        else:
+            payload[name] = inp.get_attribute("value") or ""
+
+    # selects
+    for sel in form.find_elements(By.XPATH, ".//select[@name]"):
+        name = sel.get_attribute("name")
+        s = Select(sel)
+        opt = s.first_selected_option
+        # lo más robusto es mandar el value (si no hay, manda el texto)
+        payload[name] = opt.get_attribute("value") or opt.text
+
+    # textareas
+    for ta in form.find_elements(By.XPATH, ".//textarea[@name]"):
+        name = ta.get_attribute("name")
+        payload[name] = ta.get_attribute("value") or ta.text or ""
+
+    return action_url, payload
+
+
+def requests_post_con_cookies(driver, url, payload, download_path):
+    """
+    Hace POST con requests usando cookies de Selenium.
+    Guarda respuesta en download_path.
+    Devuelve (status_code, content_type, size_bytes)
+    """
+    sess = requests.Session()
+
+    # user-agent real del browser
+    ua = driver.execute_script("return navigator.userAgent;")
+    headers = {
+        "User-Agent": ua,
+        "Referer": driver.current_url,
+        "Origin": "https://www.enargas.gov.ar",
+    }
+
+    # cookies del browser -> requests
+    for c in driver.get_cookies():
+        sess.cookies.set(c["name"], c["value"], domain=c.get("domain"), path=c.get("path", "/"))
+
+    r = sess.post(url, data=payload, headers=headers, timeout=60)
+
+    with open(download_path, "wb") as f:
+        f.write(r.content)
+
+    return r.status_code, r.headers.get("Content-Type", ""), len(r.content)
+
+
 def descargar_estadisticas():
     periodo = str(datetime.now().year)
     print(f"📅 Período objetivo: {periodo}")
@@ -66,23 +130,8 @@ def descargar_estadisticas():
     download_dir = os.path.abspath("descargas_enargas")
     os.makedirs(download_dir, exist_ok=True)
 
-    prefs = {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": True,
-    }
-    options.add_experimental_option("prefs", prefs)
-
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
-
-    # ✅ CLAVE: habilitar descargas explícitamente en headless (Actions)
-    driver.execute_cdp_cmd("Page.setDownloadBehavior", {
-        "behavior": "allow",
-        "downloadPath": download_dir
-    })
-
     wait = WebDriverWait(driver, 25)
 
     cuadros = [
@@ -102,30 +151,40 @@ def descargar_estadisticas():
             print(f"\n▶ Intentando: {cuadro}")
 
             try:
-                # Recargar y configurar SIEMPRE evita “estado roto”
+                # Recargar y setear formulario (estado limpio)
                 configurar_formulario(driver, wait, periodo_real)
 
-                prev = set(listar_xls(download_dir))
-
+                # seleccionar cuadro
                 cuadro_elem = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
                 Select(cuadro_elem).select_by_visible_text(cuadro)
 
-                btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
-                btn.click()
+                # ubicar botón
+                btn = wait.until(EC.presence_of_element_located((By.ID, "btn-ver-xls")))
 
-                nuevo = esperar_nuevo_xls(download_dir, prev, timeout=60)
-                if not nuevo:
-                    raise TimeoutError("No apareció un XLS nuevo (descarga no iniciada o bloqueada)")
+                # extraer action + payload real del form
+                action_url, payload = extraer_form_y_payload(driver, btn)
 
-                print(f"✅ Descarga OK -> {os.path.basename(nuevo)}")
+                # nombre de archivo
+                ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                fname = f"{slugify(cuadro)}-{periodo_real}-{ts}.xls"
+                out_path = os.path.join(download_dir, fname)
+
+                # POST vía requests (con cookies de selenium)
+                status, ctype, size = requests_post_con_cookies(driver, action_url, payload, out_path)
+
+                print(f"✅ Guardado: {fname} | status={status} | type={ctype} | bytes={size}")
+
+                # Si ENARGAS devuelve HTML de error, lo vas a ver por content-type o tamaño.
+                # Igual lo guardamos porque tus otros scripts ya manejan HTML->tabla.
+                time.sleep(0.5)
 
             except Exception as e:
                 os.makedirs("debug", exist_ok=True)
-                driver.save_screenshot(f"debug/error_{cuadro.replace(' ', '_')}.png")
-                with open(f"debug/error_{cuadro.replace(' ', '_')}.html", "w", encoding="utf-8") as f:
+                driver.save_screenshot(f"debug/error_{slugify(cuadro)}.png")
+                with open(f"debug/error_{slugify(cuadro)}.html", "w", encoding="utf-8") as f:
                     f.write(driver.page_source)
 
-                print(f"❌ Error al descargar: {cuadro}")
+                print(f"❌ Error en: {cuadro}")
                 print(repr(e))
 
     finally:
@@ -135,3 +194,4 @@ def descargar_estadisticas():
 
 if __name__ == "__main__":
     descargar_estadisticas()
+
