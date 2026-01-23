@@ -20,30 +20,23 @@ def listar_xls(download_dir: str):
     return sorted(files, key=os.path.getmtime)
 
 
-def esperar_nuevo_xls(download_dir: str, prev_set: set, timeout: int = 120):
-    """Espera a que aparezca un .xls nuevo y que no haya .crdownload."""
+def esperar_nuevo_xls(download_dir: str, prev_set: set, timeout: int = 60):
     t0 = time.time()
     while time.time() - t0 < timeout:
-        if any(name.endswith(".crdownload") for name in os.listdir(download_dir)):
-            time.sleep(0.5)
-            continue
-
-        actuales = set(listar_xls(download_dir))
+        actuales = set(glob(os.path.join(download_dir, "*.xls")))
         nuevos = list(actuales - prev_set)
         if nuevos:
             return max(nuevos, key=os.path.getmtime)
-
-        time.sleep(0.5)
-
+        time.sleep(1)
     return None
 
 
-def seleccionar_tipo_y_periodo(wait, periodo: str):
-    # Tipo consulta
+def configurar_formulario(driver, wait, periodo: str):
+    driver.get(URL)
+
     Select(wait.until(EC.presence_of_element_located((By.ID, "tipo-consulta-gnc")))) \
         .select_by_visible_text("Prácticas informadas por Tipo de Operación")
 
-    # Periodo/año (si no existe, fallback al año anterior)
     periodo_select = Select(wait.until(EC.presence_of_element_located((By.ID, "periodo"))))
     opciones = [o.text.strip() for o in periodo_select.options]
 
@@ -51,14 +44,13 @@ def seleccionar_tipo_y_periodo(wait, periodo: str):
         periodo_select.select_by_visible_text(periodo)
         return periodo
 
-    # fallback al año anterior
     prev = str(int(periodo) - 1)
     if prev in opciones:
         periodo_select.select_by_visible_text(prev)
         print(f"⚠️ El año {periodo} no está disponible. Fallback a {prev}.")
         return prev
 
-    raise ValueError(f"No encontré el período {periodo} ni {prev} en el combo 'periodo'. Opciones: {opciones}")
+    raise ValueError(f"No encontré {periodo} ni {prev} en 'periodo'. Opciones: {opciones}")
 
 
 def descargar_estadisticas():
@@ -66,7 +58,7 @@ def descargar_estadisticas():
     print(f"📅 Período objetivo: {periodo}")
 
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless=new")         # clave en Actions
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920x1080")
@@ -84,6 +76,13 @@ def descargar_estadisticas():
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
+
+    # ✅ CLAVE: habilitar descargas explícitamente en headless (Actions)
+    driver.execute_cdp_cmd("Page.setDownloadBehavior", {
+        "behavior": "allow",
+        "downloadPath": download_dir
+    })
+
     wait = WebDriverWait(driver, 25)
 
     cuadros = [
@@ -96,47 +95,42 @@ def descargar_estadisticas():
     ]
 
     try:
-        driver.get(URL)
-
-        periodo_real = seleccionar_tipo_y_periodo(wait, periodo)
+        periodo_real = configurar_formulario(driver, wait, periodo)
         print(f"✅ Período seleccionado: {periodo_real}")
 
         for cuadro in cuadros:
+            print(f"\n▶ Intentando: {cuadro}")
+
             try:
+                # Recargar y configurar SIEMPRE evita “estado roto”
+                configurar_formulario(driver, wait, periodo_real)
+
                 prev = set(listar_xls(download_dir))
 
-                # Reasegurar tipo/periodo antes de cada descarga (porque el sitio a veces “resetea”)
-                # Esto es lo que suele romper del 2do en adelante.
-                seleccionar_tipo_y_periodo(wait, periodo_real)
-
                 cuadro_elem = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
-                wait.until(lambda d: len(cuadro_elem.find_elements(By.TAG_NAME, "option")) > 1)
-
                 Select(cuadro_elem).select_by_visible_text(cuadro)
 
-                # Esperar que el botón sea clickeable
                 btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
                 btn.click()
 
-                nuevo = esperar_nuevo_xls(download_dir, prev, timeout=120)
+                nuevo = esperar_nuevo_xls(download_dir, prev, timeout=60)
                 if not nuevo:
                     raise TimeoutError("No apareció un XLS nuevo (descarga no iniciada o bloqueada)")
 
-                print(f"✅ Descargando OK: {cuadro} -> {os.path.basename(nuevo)}")
-
-                # mini respiro: algunos sitios se “atragantan” si spameás clicks
-                time.sleep(0.8)
+                print(f"✅ Descarga OK -> {os.path.basename(nuevo)}")
 
             except Exception as e:
-                # screenshot para ver qué dejó el sitio
                 os.makedirs("debug", exist_ok=True)
                 driver.save_screenshot(f"debug/error_{cuadro.replace(' ', '_')}.png")
+                with open(f"debug/error_{cuadro.replace(' ', '_')}.html", "w", encoding="utf-8") as f:
+                    f.write(driver.page_source)
+
                 print(f"❌ Error al descargar: {cuadro}")
                 print(repr(e))
 
     finally:
         driver.quit()
-        print("✔️ Descargas finalizadas.")
+        print("\n✔️ Descargas finalizadas.")
 
 
 if __name__ == "__main__":
