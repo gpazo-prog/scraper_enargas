@@ -17,6 +17,16 @@ import requests
 
 URL = "https://www.enargas.gov.ar/secciones/gas-natural-comprimido/estadisticas.php"
 
+# ✅ Claves compatibles con tu pipeline viejo (procesar_a_db.py + tabla practicas)
+TIPO_POR_CUADRO = {
+    "Conversiones de vehículos": "conversiones",
+    "Desmontajes de equipos en vehículos": "desmontajes",
+    "Revisiones periódicas de vehículos": "revisiones",
+    "Modificaciones de equipos en vehículos": "modificaciones",
+    "Revisiones de Cilindros": "revisiones-cilindros-crpc",
+    "Cilindro de GNC revisiones CRPC": "revisiones-crpc",
+}
+
 
 def slugify(txt: str) -> str:
     txt = txt.lower()
@@ -78,7 +88,6 @@ def extraer_form_y_payload(driver, btn_elem):
         name = sel.get_attribute("name")
         s = Select(sel)
         opt = s.first_selected_option
-        # lo más robusto es mandar el value (si no hay, manda el texto)
         payload[name] = opt.get_attribute("value") or opt.text
 
     # textareas
@@ -97,7 +106,6 @@ def requests_post_con_cookies(driver, url, payload, download_path):
     """
     sess = requests.Session()
 
-    # user-agent real del browser
     ua = driver.execute_script("return navigator.userAgent;")
     headers = {
         "User-Agent": ua,
@@ -105,7 +113,6 @@ def requests_post_con_cookies(driver, url, payload, download_path):
         "Origin": "https://www.enargas.gov.ar",
     }
 
-    # cookies del browser -> requests
     for c in driver.get_cookies():
         sess.cookies.set(c["name"], c["value"], domain=c.get("domain"), path=c.get("path", "/"))
 
@@ -134,14 +141,7 @@ def descargar_estadisticas():
     driver = webdriver.Chrome(service=service, options=options)
     wait = WebDriverWait(driver, 25)
 
-    cuadros = [
-        "Conversiones de vehículos",
-        "Desmontajes de equipos en vehículos",
-        "Revisiones periódicas de vehículos",
-        "Modificaciones de equipos en vehículos",
-        "Revisiones de Cilindros",
-        "Cilindro de GNC revisiones CRPC",
-    ]
+    cuadros = list(TIPO_POR_CUADRO.keys())
 
     try:
         periodo_real = configurar_formulario(driver, wait, periodo)
@@ -151,32 +151,27 @@ def descargar_estadisticas():
             print(f"\n▶ Intentando: {cuadro}")
 
             try:
-                # Recargar y setear formulario (estado limpio)
                 configurar_formulario(driver, wait, periodo_real)
 
-                # seleccionar cuadro
                 cuadro_elem = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
                 Select(cuadro_elem).select_by_visible_text(cuadro)
 
-                # ubicar botón
                 btn = wait.until(EC.presence_of_element_located((By.ID, "btn-ver-xls")))
 
-                # extraer action + payload real del form
                 action_url, payload = extraer_form_y_payload(driver, btn)
 
-                # nombre de archivo
-                ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-                fname = f"{slugify(cuadro)}-{periodo_real}-{ts}.xls"
+                # ✅ Nombre compatible con el regex viejo: tipo-YYYYMMDD-HHMMSS.xls
+                tipo_key = TIPO_POR_CUADRO[cuadro]
+                ts = datetime.now()
+                fname = f"{tipo_key}-{ts:%Y%m%d}-{ts:%H%M%S}.xls"
                 out_path = os.path.join(download_dir, fname)
 
-                # POST vía requests (con cookies de selenium)
                 status, ctype, size = requests_post_con_cookies(driver, action_url, payload, out_path)
 
                 print(f"✅ Guardado: {fname} | status={status} | type={ctype} | bytes={size}")
 
-                # Si ENARGAS devuelve HTML de error, lo vas a ver por content-type o tamaño.
-                # Igual lo guardamos porque tus otros scripts ya manejan HTML->tabla.
-                time.sleep(0.5)
+                # evita colisiones de HHMMSS + le da aire al server
+                time.sleep(1.1)
 
             except Exception as e:
                 os.makedirs("debug", exist_ok=True)
@@ -194,4 +189,3 @@ def descargar_estadisticas():
 
 if __name__ == "__main__":
     descargar_estadisticas()
-
