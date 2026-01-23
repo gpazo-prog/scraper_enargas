@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+import os
+import re
+import time
+from datetime import datetime
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -6,18 +11,19 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-import os
-import re
-import time
-from datetime import datetime
-from urllib.parse import urljoin
-
-import requests
-
 
 URL = "https://www.enargas.gov.ar/secciones/gas-natural-comprimido/estadisticas.php"
 
-# ✅ Claves compatibles con tu pipeline (procesar_a_db.py + tabla practicas)
+CUADROS = [
+    "Conversiones de vehículos",
+    "Desmontajes de equipos en vehículos",
+    "Revisiones periódicas de vehículos",
+    "Modificaciones de equipos en vehículos",
+    "Revisiones de Cilindros",
+    "Cilindro de GNC revisiones CRPC",
+]
+
+# ✅ Nombres “viejos” compatibles con tu pipeline y con Drive
 TIPO_POR_CUADRO = {
     "Conversiones de vehículos": "conversiones",
     "Desmontajes de equipos en vehículos": "desmontajes",
@@ -37,6 +43,52 @@ def slugify(txt: str) -> str:
     txt = re.sub(r"[úùüû]", "u", txt)
     txt = re.sub(r"[^a-z0-9]+", "-", txt).strip("-")
     return txt
+
+
+def configurar_descargas(driver, download_dir: str):
+    """
+    En headless, Chrome a veces no descarga si no habilitás el comportamiento vía CDP.
+    """
+    os.makedirs(download_dir, exist_ok=True)
+    try:
+        driver.execute_cdp_cmd(
+            "Page.setDownloadBehavior",
+            {"behavior": "allow", "downloadPath": download_dir},
+        )
+    except Exception:
+        # En algunas versiones puede variar, pero normalmente funciona así.
+        pass
+
+
+def listar_archivos(download_dir: str):
+    return {f for f in os.listdir(download_dir) if os.path.isfile(os.path.join(download_dir, f))}
+
+
+def esperar_descarga_nueva(download_dir: str, antes: set, timeout=120):
+    """
+    Espera a que aparezca un archivo nuevo (y que no tenga .crdownload).
+    Devuelve el nombre del archivo nuevo.
+    """
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        ahora = listar_archivos(download_dir)
+
+        # ignorar temporales
+        tmp = {f for f in ahora if f.endswith(".crdownload")}
+        if tmp:
+            time.sleep(0.5)
+            continue
+
+        nuevos = list(ahora - antes)
+        if nuevos:
+            # si aparecen varios, tomar el más reciente
+            nuevos_paths = [os.path.join(download_dir, n) for n in nuevos]
+            nuevos_paths.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+            return os.path.basename(nuevos_paths[0])
+
+        time.sleep(0.5)
+
+    raise TimeoutError("No apareció ningún archivo descargado nuevo (posible bloqueo o demora del sitio).")
 
 
 def configurar_formulario(driver, wait, periodo: str):
@@ -61,177 +113,114 @@ def configurar_formulario(driver, wait, periodo: str):
     raise ValueError(f"No encontré {periodo} ni {prev} en 'periodo'. Opciones: {opciones}")
 
 
-def extraer_form_y_payload(driver, btn_elem):
-    """
-    Encuentra el <form> ancestro del botón y arma:
-    - action_url absoluto
-    - payload (dict) con todos los name/value reales del form
-    + ✅ agrega name/value del botón presionado (clave para Excel)
-    """
-    form = btn_elem.find_element(By.XPATH, "ancestor::form")
-    action = form.get_attribute("action") or ""
-    action_url = urljoin(driver.current_url, action)
-
-    payload = {}
-
-    # inputs (incluye hidden/text/etc)
-    for inp in form.find_elements(By.XPATH, ".//input[@name]"):
-        name = inp.get_attribute("name")
-        itype = (inp.get_attribute("type") or "").lower()
-        if itype in ("checkbox", "radio"):
-            if inp.is_selected():
-                payload[name] = inp.get_attribute("value") or "on"
-        else:
-            payload[name] = inp.get_attribute("value") or ""
-
-    # selects
-    for sel in form.find_elements(By.XPATH, ".//select[@name]"):
-        name = sel.get_attribute("name")
-        s = Select(sel)
-        opt = s.first_selected_option
-        payload[name] = opt.get_attribute("value") or opt.text
-
-    # textareas
-    for ta in form.find_elements(By.XPATH, ".//textarea[@name]"):
-        name = ta.get_attribute("name")
-        payload[name] = ta.get_attribute("value") or ta.text or ""
-
-    # ✅ IMPORTANTÍSIMO: incluir el submit del botón XLS (muchos backends lo usan)
-    btn_name = (btn_elem.get_attribute("name") or "").strip()
-    btn_value = (btn_elem.get_attribute("value") or "").strip()
-
-    # Si el botón no trae name/value, igual forzamos los campos que el PHP pide
-    # porque el error mostrado era: Undefined array key "Excel" y "action"
-    if btn_name and (btn_value or btn_value == ""):
-        payload[btn_name] = btn_value if btn_value != "" else "1"
-
-    payload.setdefault("Excel", "Excel")
-    payload.setdefault("action", "Excel")
-
-    return action_url, payload
-
-
-def requests_post_con_cookies(driver, url, payload, download_path):
-    """
-    Hace POST con requests usando cookies de Selenium.
-    Guarda respuesta en download_path.
-    Devuelve (status_code, content_type, size_bytes, first_bytes_text)
-    """
-    sess = requests.Session()
-
-    ua = driver.execute_script("return navigator.userAgent;")
-    headers = {
-        "User-Agent": ua,
-        "Referer": driver.current_url,
-        "Origin": "https://www.enargas.gov.ar",
-    }
-
-    for c in driver.get_cookies():
-        sess.cookies.set(c["name"], c["value"], domain=c.get("domain"), path=c.get("path", "/"))
-
-    r = sess.post(url, data=payload, headers=headers, timeout=60)
-
-    with open(download_path, "wb") as f:
-        f.write(r.content)
-
-    head_text = ""
-    try:
-        head_text = r.content[:300].decode("utf-8", errors="ignore")
-    except Exception:
-        head_text = ""
-
-    return r.status_code, r.headers.get("Content-Type", ""), len(r.content), head_text
-
-
-def respuesta_es_error(head_text: str) -> bool:
-    ht = (head_text or "").lower()
-    # errores típicos que ya viste en 2026
-    return any(x in ht for x in [
-        "undefined array key",
-        "warning",
-        "la solicitud no pudo ser procesada",
-        "no pudo ser procesada correctamente",
-        "fatal error",
-        "deprecated:",
-    ])
-
-
 def descargar_estadisticas():
     periodo = str(datetime.now().year)
     print(f"📅 Período objetivo: {periodo}")
 
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920x1080")
-
     download_dir = os.path.abspath("descargas_enargas")
     os.makedirs(download_dir, exist_ok=True)
 
+    options = webdriver.ChromeOptions()
+
+    # Headless + estabilidad en GitHub Actions
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+
+    # ✅ Evitar prompts de descarga
+    prefs = {
+        "download.default_directory": download_dir,
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True,
+        "safebrowsing.enabled": True,
+        # a veces ayuda con sitios “quisquillosos”
+        "profile.default_content_settings.popups": 0,
+    }
+    options.add_experimental_option("prefs", prefs)
+
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
-    wait = WebDriverWait(driver, 25)
-
-    cuadros = list(TIPO_POR_CUADRO.keys())
+    configurar_descargas(driver, download_dir)
+    wait = WebDriverWait(driver, 30)
 
     try:
         periodo_real = configurar_formulario(driver, wait, periodo)
         print(f"✅ Período seleccionado: {periodo_real}")
 
-        for cuadro in cuadros:
-            print(f"\n▶ Intentando: {cuadro}")
+        for cuadro in CUADROS:
+            tipo = TIPO_POR_CUADRO.get(cuadro, slugify(cuadro))
+            print(f"\n▶ Descargando: {cuadro}")
 
-            tipo_key = TIPO_POR_CUADRO[cuadro]
-
-            # ✅ reintentos (porque ENARGAS a veces responde “intente nuevamente”)
             ok = False
             last_err = None
 
+            # ✅ reintentos (ENARGAS a veces responde “intente nuevamente”)
             for intento in range(1, 4):
                 try:
+                    # Estado limpio
                     configurar_formulario(driver, wait, periodo_real)
 
                     cuadro_elem = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
                     Select(cuadro_elem).select_by_visible_text(cuadro)
 
-                    btn = wait.until(EC.presence_of_element_located((By.ID, "btn-ver-xls")))
+                    # Snapshot antes de click
+                    antes = listar_archivos(download_dir)
 
-                    action_url, payload = extraer_form_y_payload(driver, btn)
+                    # Click real (ejecuta reCAPTCHA + submit como humano)
+                    btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
+                    btn.click()
 
+                    # Esperar descarga
+                    descargado = esperar_descarga_nueva(download_dir, antes, timeout=120)
+
+                    # Renombrar a formato viejo: tipo-YYYYMMDD-HHMMSS.xls
                     ts = datetime.now()
-                    fname = f"{tipo_key}-{ts:%Y%m%d}-{ts:%H%M%S}.xls"
-                    out_path = os.path.join(download_dir, fname)
+                    nuevo_nombre = f"{tipo}-{ts:%Y%m%d}-{ts:%H%M%S}.xls"
 
-                    status, ctype, size, head_text = requests_post_con_cookies(driver, action_url, payload, out_path)
+                    src = os.path.join(download_dir, descargado)
+                    dst = os.path.join(download_dir, nuevo_nombre)
 
-                    if status != 200 or respuesta_es_error(head_text):
-                        raise RuntimeError(
-                            f"Respuesta inválida (intento {intento}/3): status={status}, type={ctype}, bytes={size}"
-                        )
+                    # Si por casualidad existe, agregar sufijo
+                    if os.path.exists(dst):
+                        dst = os.path.join(download_dir, f"{tipo}-{ts:%Y%m%d}-{ts:%H%M%S}-{int(time.time())}.xls")
 
-                    print(f"✅ Guardado OK: {fname} | status={status} | type={ctype} | bytes={size}")
+                    os.replace(src, dst)
+
+                    # Validación rápida: si pesa ~400 bytes es error HTML
+                    size = os.path.getsize(dst)
+                    if size < 1500:
+                        # guardo contenido para debug y reintento
+                        os.makedirs("debug", exist_ok=True)
+                        with open(dst, "rb") as f:
+                            content = f.read(3000)
+                        with open(os.path.join("debug", f"error_{tipo}.html"), "wb") as f:
+                            f.write(content)
+                        raise RuntimeError(f"Archivo demasiado chico ({size} bytes). Probable error del servidor.")
+
+                    print(f"✅ OK: {os.path.basename(dst)} | {size} bytes")
                     ok = True
-                    time.sleep(1.1)  # evita colisiones de HHMMSS
+                    time.sleep(1.2)
                     break
 
                 except Exception as e:
                     last_err = e
-                    # backoff
                     time.sleep(2 * intento)
 
             if not ok:
                 os.makedirs("debug", exist_ok=True)
-                driver.save_screenshot(f"debug/error_{slugify(cuadro)}.png")
-                with open(f"debug/error_{slugify(cuadro)}.html", "w", encoding="utf-8") as f:
+                driver.save_screenshot(f"debug/error_{tipo}.png")
+                with open(f"debug/error_{tipo}_page.html", "w", encoding="utf-8") as f:
                     f.write(driver.page_source)
 
                 print(f"❌ Error definitivo en: {cuadro}")
                 print(repr(last_err))
 
+        print("\n✔️ Descargas finalizadas.")
+
     finally:
         driver.quit()
-        print("\n✔️ Descargas finalizadas.")
 
 
 if __name__ == "__main__":
