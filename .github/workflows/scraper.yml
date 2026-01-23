@@ -27,7 +27,7 @@ jobs:
 # scraper descarga los xls de la pagina del enargas
     - name: Ejecutar el scraper
       run: |
-        python scraper_enargas.py
+        python -u scraper_enargas.py
 
 #Con eso vas a poder bajar el artifact y ver:
 #si realmente se creó descargas_enargas/
