@@ -18,10 +18,22 @@ def descargar_estadisticas():
 
     download_dir = os.path.abspath("descargas_enargas")
     os.makedirs(download_dir, exist_ok=True)
+# Viejos PREFS
+#    prefs = {"download.default_directory": download_dir}
 
-    prefs = {"download.default_directory": download_dir}
+# Nueva propuesta:
+
+    prefs = {
+    "download.default_directory": download_dir,
+    "download.prompt_for_download": False,
+    "download.directory_upgrade": True,
+    "safebrowsing.enabled": True
+    }
+    
     options.add_experimental_option("prefs", prefs)
 
+
+    
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     wait = WebDriverWait(driver, 5)
@@ -41,20 +53,67 @@ def descargar_estadisticas():
         "Revisiones de Cilindros",
         "Cilindro de GNC revisiones CRPC"
     ]
+# VIEJO FOR SE ROMPIO EL 13/1/2026
+#    for cuadro in cuadros:
+#        try:
+#            wait.until(EC.text_to_be_present_in_element((By.ID, "cuadro"), cuadro))
+#            Select(wait.until(EC.presence_of_element_located((By.ID, "cuadro"))))\
+#                .select_by_visible_text(cuadro)
+#            wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
+#            driver.find_element(By.ID, "btn-ver-xls").click()
+#            print(f"✅ Descargando: {cuadro}")
+#            time.sleep(2)
+#        except Exception as e:
+#            print(f"❌ Error al descargar: {cuadro}")
+#            print(e)
 
+#Nueva propuesta
+    
+    wait = WebDriverWait(driver, 20)
+    
+    def esperar_descarga_completa(download_dir, timeout=60):
+        import time, os
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            # Chrome deja archivos temporales .crdownload
+            tmp = [f for f in os.listdir(download_dir) if f.endswith(".crdownload")]
+            if not tmp:
+                return True
+            time.sleep(0.5)
+        return False
+    
+    cuadros = [
+        "Conversiones de vehículos",
+        "Desmontajes de equipos en vehículos",
+        "Revisiones periódicas de vehículos",
+        "Modificaciones de equipos en vehículos",
+        "Revisiones de Cilindros",
+        "Cilindro de GNC revisiones CRPC"
+    ]
+    
     for cuadro in cuadros:
         try:
-            wait.until(EC.text_to_be_present_in_element((By.ID, "cuadro"), cuadro))
-            Select(wait.until(EC.presence_of_element_located((By.ID, "cuadro"))))\
-                .select_by_visible_text(cuadro)
-            wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
-            driver.find_element(By.ID, "btn-ver-xls").click()
+            # Re-obtener el select cada vez (evita StaleElement si el DOM cambia)
+            cuadro_select = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
+    
+            # Esperar que tenga options cargadas
+            wait.until(lambda d: len(cuadro_select.find_elements(By.TAG_NAME, "option")) > 1)
+    
+            Select(cuadro_select).select_by_visible_text(cuadro)
+    
+            btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
+            btn.click()
+    
+            ok = esperar_descarga_completa(download_dir, timeout=60)
+            if not ok:
+                raise TimeoutError("La descarga no terminó (sigue .crdownload)")
+    
             print(f"✅ Descargando: {cuadro}")
-            time.sleep(2)
+    
         except Exception as e:
             print(f"❌ Error al descargar: {cuadro}")
-            print(e)
-
+            print(repr(e))
+    
     driver.quit()
     print("✔️ Descargas finalizadas.")
 
