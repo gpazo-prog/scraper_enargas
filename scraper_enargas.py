@@ -4,9 +4,8 @@ Scraper ENARGAS — descarga XLS por tipo de operación (GNC)
 Robusto para GitHub Actions / Headless
 
 - Selecciona: "Prácticas informadas por Tipo de Operación"
-- Selecciona año (periodo): 2026 (podés parametrizarlo)
+- Selecciona año automáticamente (año actual)
 - Recorre los "cuadros" y descarga un XLS por cada uno
-- Espera a que aparezca un archivo .xls nuevo para confirmar descarga
 """
 
 from selenium import webdriver
@@ -19,23 +18,18 @@ from webdriver_manager.chrome import ChromeDriverManager
 import os
 import time
 from glob import glob
+from datetime import datetime
 
 
 URL = "https://www.enargas.gov.ar/secciones/gas-natural-comprimido/estadisticas.php"
 
 
 def listar_xls(download_dir: str):
-    """Lista .xls ordenados por fecha de modificación (asc)."""
     files = glob(os.path.join(download_dir, "*.xls"))
     return sorted(files, key=os.path.getmtime)
 
 
 def esperar_nuevo_xls(download_dir: str, prev_set: set, timeout: int = 90):
-    """
-    Espera hasta que aparezca un .xls nuevo en download_dir respecto a prev_set.
-    También espera a que no haya .crdownload en curso.
-    Devuelve el path del nuevo archivo o None si timeout.
-    """
     t0 = time.time()
     while time.time() - t0 < timeout:
         # si hay descargas en curso, esperar
@@ -46,7 +40,6 @@ def esperar_nuevo_xls(download_dir: str, prev_set: set, timeout: int = 90):
         actuales = set(listar_xls(download_dir))
         nuevos = list(actuales - prev_set)
         if nuevos:
-            # devolver el más nuevo (por mtime)
             return max(nuevos, key=os.path.getmtime)
 
         time.sleep(0.5)
@@ -54,10 +47,12 @@ def esperar_nuevo_xls(download_dir: str, prev_set: set, timeout: int = 90):
     return None
 
 
-def descargar_estadisticas(periodo: str = "2026"):
-    options = webdriver.ChromeOptions()
+def descargar_estadisticas():
+    # Año automático
+    periodo = str(datetime.now().year)
+    print(f"📅 Período seleccionado automáticamente: {periodo}")
 
-    # En Actions, esto suele ser más estable para descargas que --headless "viejo"
+    options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
@@ -81,11 +76,9 @@ def descargar_estadisticas(periodo: str = "2026"):
     try:
         driver.get(URL)
 
-        # Tipo consulta
         Select(wait.until(EC.presence_of_element_located((By.ID, "tipo-consulta-gnc")))) \
             .select_by_visible_text("Prácticas informadas por Tipo de Operación")
 
-        # Periodo/año
         Select(wait.until(EC.presence_of_element_located((By.ID, "periodo")))) \
             .select_by_visible_text(periodo)
 
@@ -102,20 +95,14 @@ def descargar_estadisticas(periodo: str = "2026"):
             try:
                 prev = set(listar_xls(download_dir))
 
-                # Re-obtener el select cada vez (evita StaleElement si el DOM cambia)
                 cuadro_select = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
-
-                # Esperar a que existan opciones cargadas
                 wait.until(lambda d: len(cuadro_select.find_elements(By.TAG_NAME, "option")) > 1)
 
-                # Seleccionar cuadro
                 Select(cuadro_select).select_by_visible_text(cuadro)
 
-                # Click en "ver xls"
                 btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
                 btn.click()
 
-                # Esperar que aparezca un XLS nuevo
                 nuevo = esperar_nuevo_xls(download_dir, prev, timeout=90)
                 if not nuevo:
                     raise TimeoutError("No apareció un XLS nuevo (descarga no iniciada o bloqueada)")
@@ -132,4 +119,5 @@ def descargar_estadisticas(periodo: str = "2026"):
 
 
 if __name__ == "__main__":
-    descargar_estadisticas("2026")
+    descargar_estadisticas()
+
