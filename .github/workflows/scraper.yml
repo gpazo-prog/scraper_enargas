@@ -29,6 +29,27 @@ jobs:
       run: |
         python scraper_enargas.py
 
+#Con eso vas a poder bajar el artifact y ver:
+#si realmente se creó descargas_enargas/
+#si aparecen .xls o quedan .crdownload
+#y los screenshots en debug/        
+    - name: Listar descargas
+      run: |
+        echo "PWD=$(pwd)"
+        ls -lah
+        ls -lah descargas_enargas || true
+        ls -lah debug || true
+    
+    - name: Subir artifacts de debug
+      uses: actions/upload-artifact@v4
+      with:
+        name: enargas-debug
+        path: |
+          descargas_enargas
+          debug
+        if-no-files-found: warn
+        
+
    # - name: Subir archivos al repo
    #   run: |
    #     git config --global user.name "github-actions"
