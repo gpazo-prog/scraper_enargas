@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 
 URL = "https://www.enargas.gov.ar/secciones/gas-natural-comprimido/estadisticas.php"
@@ -22,13 +23,13 @@ def configurar_descargas(driver, download_dir):
 
 
 def snapshot_descargas(download_dir):
-    """
-    Snapshot de archivos descargados: {filename: (mtime, size)}
-    Ignora .crdownload y .html (downloads.html, etc).
-    """
     snap = {}
+    if not os.path.isdir(download_dir):
+        return snap
+
     for fn in os.listdir(download_dir):
         low = fn.lower()
+        # NO contamos temporales ni html “internos”
         if low.endswith(".crdownload") or low.endswith(".html"):
             continue
         path = os.path.join(download_dir, fn)
@@ -38,31 +39,25 @@ def snapshot_descargas(download_dir):
 
 
 def esperar_descarga(download_dir, snap_antes, timeout=180):
-    """
-    Espera archivo nuevo o modificado (por overwrite) en download_dir.
-    NO renombra, NO valida contenido.
-    """
     t0 = time.time()
     ultimo_log = -1
 
     while time.time() - t0 < timeout:
-        # Si hay descargas activas
-        try:
+        # Esperar que no queden .crdownload activos
+        if os.path.isdir(download_dir):
             if any(f.endswith(".crdownload") for f in os.listdir(download_dir)):
-                time.sleep(0.5)
+                time.sleep(0.4)
                 continue
-        except FileNotFoundError:
-            os.makedirs(download_dir, exist_ok=True)
 
         snap_despues = snapshot_descargas(download_dir)
 
-        # 1) nuevo
+        # Nuevo archivo
         nuevos = set(snap_despues.keys()) - set(snap_antes.keys())
         if nuevos:
             cand = sorted(nuevos, key=lambda fn: snap_despues[fn][0], reverse=True)
             return cand[0]
 
-        # 2) modificado (overwrite)
+        # Archivo existente modificado (por overwrite)
         comunes = set(snap_despues.keys()) & set(snap_antes.keys())
         cambiados = [fn for fn in comunes if snap_despues[fn] != snap_antes[fn]]
         if cambiados:
@@ -77,21 +72,6 @@ def esperar_descarga(download_dir, snap_antes, timeout=180):
         time.sleep(0.5)
 
     raise TimeoutError("No apareció ninguna descarga (nueva o modificada) dentro del timeout.")
-
-
-def esperar_nueva_ventana(driver, handles_antes, timeout=10):
-    """
-    Espera que aparezca un nuevo window handle.
-    Devuelve el handle nuevo o None si no aparece.
-    """
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        handles = driver.window_handles
-        nuevos = [h for h in handles if h not in handles_antes]
-        if nuevos:
-            return nuevos[0]
-        time.sleep(0.2)
-    return None
 
 
 def seleccionar_periodo(driver, wait, periodo_objetivo: str) -> str:
@@ -123,6 +103,39 @@ def configurar_formulario(driver, wait, periodo_objetivo: str) -> str:
     return periodo_real
 
 
+def click_ver_excel(driver, wait):
+    """
+    Hace click de forma robusta:
+    1) scroll + ActionChains click
+    2) JS click
+    3) ejecutar la función real del onClick (igual que humano)
+    """
+    btn = wait.until(EC.presence_of_element_located((By.ID, "btn-ver-xls")))
+
+    # Asegurar que esté en pantalla
+    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
+    time.sleep(0.2)
+
+    # 1) Click “humano”
+    try:
+        wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
+        ActionChains(driver).move_to_element(btn).pause(0.1).click(btn).perform()
+        return
+    except Exception:
+        pass
+
+    # 2) JS click
+    try:
+        driver.execute_script("arguments[0].click();", btn)
+        return
+    except Exception:
+        pass
+
+    # 3) Ejecutar exactamente la función del onClick del HTML
+    # (según tu inspección: GenerarConsultaEstadisticasGNC_N('Excel'))
+    driver.execute_script("return GenerarConsultaEstadisticasGNC_N('Excel');")
+
+
 def descargar_estadisticas():
     periodo_objetivo = str(datetime.now().year)
     print(f"📅 Período objetivo: {periodo_objetivo}", flush=True)
@@ -135,7 +148,6 @@ def descargar_estadisticas():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920x1080")
-    # OJO: si el sitio abre popup/tab, no lo bloqueamos
     options.add_argument("--disable-popup-blocking")
 
     prefs = {
@@ -179,46 +191,21 @@ def descargar_estadisticas():
                 cuadro_elem = wait.until(EC.presence_of_element_located((By.ID, "cuadro")))
                 Select(cuadro_elem).select_by_visible_text(cuadro)
 
+                # Pequeña pausa para que el DOM/JS asiente valores (token, etc)
+                time.sleep(0.3)
+
                 # Snapshot antes de descargar
                 snap_antes = snapshot_descargas(download_dir)
 
-                # Guardar handles actuales (para detectar nueva ventana/tab)
-                handles_antes = driver.window_handles[:]
-                original = driver.current_window_handle
-
-                # Click real
-                btn = wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
                 print("🖱️ Click en Ver Excel...", flush=True)
-                btn.click()
+                click_ver_excel(driver, wait)
 
-                # Si abre nueva ventana/tab, cambiar a esa ventana
-                nuevo_handle = esperar_nueva_ventana(driver, handles_antes, timeout=10)
-                if nuevo_handle:
-                    print("🪟 Se abrió una nueva ventana/tab, cambiando...", flush=True)
-                    driver.switch_to.window(nuevo_handle)
-                    # En algunas webs, la descarga se dispara al cargar esa página:
-                    time.sleep(0.5)
-                else:
-                    print("ℹ️ No se detectó nueva ventana/tab.", flush=True)
-
-                # Esperar descarga
                 print("⏳ Esperando descarga...", flush=True)
                 archivo = esperar_descarga(download_dir, snap_antes, timeout=180)
+
                 path = os.path.join(download_dir, archivo)
                 size = os.path.getsize(path) if os.path.exists(path) else -1
                 print(f"✅ Descarga completada: {archivo} | {size} bytes", flush=True)
-
-                # Cerrar la ventana nueva si existe y volver a la original
-                if nuevo_handle:
-                    try:
-                        driver.close()
-                    except Exception:
-                        pass
-                    try:
-                        driver.switch_to.window(original)
-                    except Exception:
-                        # si por alguna razón no existe, al menos seguimos
-                        pass
 
                 time.sleep(0.5)
 
