@@ -18,13 +18,10 @@ def descargar_estadisticas():
 
     download_dir = os.path.abspath("descargas_enargas")
     os.makedirs(download_dir, exist_ok=True)
-    prefs = {"download.default_directory": download_dir}
 
-    
+    prefs = {"download.default_directory": download_dir}
     options.add_experimental_option("prefs", prefs)
 
-
-    
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     wait = WebDriverWait(driver, 5)
@@ -44,6 +41,7 @@ def descargar_estadisticas():
         "Revisiones de Cilindros",
         "Cilindro de GNC revisiones CRPC"
     ]
+
     for cuadro in cuadros:
         try:
             wait.until(EC.text_to_be_present_in_element((By.ID, "cuadro"), cuadro))
@@ -57,8 +55,6 @@ def descargar_estadisticas():
             print(f"❌ Error al descargar: {cuadro}")
             print(e)
 
-
-    
     driver.quit()
     print("✔️ Descargas finalizadas.")
 
