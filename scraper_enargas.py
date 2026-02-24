@@ -50,7 +50,7 @@ def descargar_estadisticas():
             wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
             driver.find_element(By.ID, "btn-ver-xls").click()
             print(f"✅ Descargando: {cuadro}")
-            time.sleep(2)
+            time.sleep(20)
         except Exception as e:
             print(f"❌ Error al descargar: {cuadro}")
             print(e)
