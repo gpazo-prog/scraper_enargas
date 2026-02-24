@@ -44,8 +44,8 @@ def descargar_estadisticas():
 
     for cuadro in cuadros:
         try:
-            wait.until(EC.text_to_be_present_in_element((By.ID, "cuadro"), cuadro))
-            Select(wait.until(EC.presence_of_element_located((By.ID, "cuadro"))))\
+            wait.until(EC.text_to_be_present_in_element((By.ID, "div-cuadro-combo"), cuadro))
+            Select(wait.until(EC.presence_of_element_located((By.ID, "div-cuadro-combo"))))\
                 .select_by_visible_text(cuadro)
             wait.until(EC.element_to_be_clickable((By.ID, "btn-ver-xls")))
             driver.find_element(By.ID, "btn-ver-xls").click()
