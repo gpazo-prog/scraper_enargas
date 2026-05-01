@@ -1,9 +1,9 @@
 #comentario para revivirlo x5 15/12/2025
 name: Descargar archivos ENARGAS
 
-on:
-  schedule:
-    - cron: '0 9 * * *'  # Todos los días a las 6 AM Argentina
+#on:
+#  schedule:
+#    - cron: '0 9 * * *'  # Todos los días a las 6 AM Argentina
   workflow_dispatch:
 
 permissions:
